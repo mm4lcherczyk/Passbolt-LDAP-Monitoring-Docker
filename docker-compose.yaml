@@ -1,0 +1,180 @@
+services:
+
+  db:
+    image: mariadb:10.11
+    container_name: db
+    env_file:
+      - env/mysql.env
+    volumes:
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - database_volume:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  passbolt:
+    build: .
+    container_name: passbolt
+    depends_on:
+      - db
+      - mailhog
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    env_file:
+      - env/passbolt.env
+    volumes:
+      - ${PASSBOLT_API_PATH}:/var/www/passbolt
+      - gpg_volume:/var/www/passbolt/config/gpg
+      - images_volume:/var/www/passbolt/webroot/img/public/images
+    command: ["/usr/bin/wait-for.sh", "db:3306", "--", "/docker-entrypoint.sh"]
+    ports:
+      - 80:80
+      - 443:443
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    depends_on:
+      - grafana
+      - adminer
+      - prometheus
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    ports:
+      - "8443:443"
+
+  ####################
+  #     DEV TOOLS    #
+  ####################
+
+  adminer:
+    image: adminer
+    container_name: adminer
+    restart: always
+    ports:
+      - "9501:8080"
+    depends_on:
+      - db
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    restart: always
+    # Mailhog logs are noisy so not logging it
+    logging:
+      driver: none
+    ports:
+      - "1025:1025" # SMTP server
+      - "9502:8025" # Web UI
+
+  openldap:
+    image: osixia/openldap:latest
+    container_name: openldap
+    command: --copy-service # needed to copy init file
+    environment:
+      LDAP_LOG_LEVEL: "256"
+      LDAP_ORGANISATION: "Example Inc."
+      LDAP_DOMAIN: "example.org"
+      LDAP_BASE_DN: ""
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_CONFIG_PASSWORD: "config"
+      LDAP_READONLY_USER: "false"
+      LDAP_RFC2307BIS_SCHEMA: "false"
+      LDAP_BACKEND: "mdb"
+      LDAP_TLS: "true"
+      LDAP_TLS_CRT_FILENAME: "ldap.crt"
+      LDAP_TLS_KEY_FILENAME: "ldap.key"
+      LDAP_TLS_DH_PARAM_FILENAME: "dhparam.pem"
+      LDAP_TLS_CA_CRT_FILENAME: "ca.crt"
+      LDAP_TLS_ENFORCE: "false"
+      LDAP_TLS_CIPHER_SUITE: "SECURE256:-VERS-SSL3.0"
+      LDAP_TLS_VERIFY_CLIENT: "demand"
+      LDAP_REPLICATION: "false"
+      KEEP_EXISTING_CONFIG: "false"
+      LDAP_REMOVE_CONFIG_AFTER_SETUP: "true"
+      LDAP_SSL_HELPER_PREFIX: "ldap"
+    tty: true
+    stdin_open: true
+    ports:
+      - "389:389"
+      - "636:636"
+    domainname: "ldap.local"
+    hostname: "ldap-server"
+
+  phpldapadmin:
+    image: osixia/phpldapadmin:latest
+    container_name: phpldapadmin
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: "openldapadmin"
+      PHPLDAPADMIN_HTTPS: "true"
+    ports:
+      - "8080:80"
+    depends_on:
+      - openldap
+
+  ####################
+  # MONITORING TOOLS #
+  ####################
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - cadvisor
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/dashboards/container-monitoring.json
+    depends_on:
+      - prometheus
+      - loki
+    ports:
+      - "3000:3000"
+
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8081:8080"
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail/config.yml:/etc/promtail/promtail.yaml
+    command: -config.file=/etc/promtail/promtail.yaml
+    depends_on:
+      - loki
+
+
+volumes:
+  database_volume:
+  gpg_volume:
+  images_volume:
+  grafana_data:
