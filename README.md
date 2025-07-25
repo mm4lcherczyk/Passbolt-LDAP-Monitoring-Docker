@@ -36,13 +36,13 @@ Konteneryzowane środowisko testowo-developerskie zawierające Passbolt CE, LDAP
 
 ```bash
 # Zbuduj obrazy
-docker compose -f build
+docker compose build
 
 # Uruchom kontenery
-docker compose -f up -d
+docker compose up -d
 ```
 
-> Plik `docker-compose-dev.yaml` zawiera definicje wszystkich kontenerów.
+> Plik `docker-compose.yaml` zawiera definicje wszystkich kontenerów.
 
 ---
 
