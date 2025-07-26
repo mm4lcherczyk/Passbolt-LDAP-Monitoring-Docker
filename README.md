@@ -40,6 +40,12 @@ docker compose build
 
 # Uruchom kontenery
 docker compose up -d
+
+# Stwórz pierwszego użytkownika (administratora) 
+docker-compose -f dev/docker-compose-dev.yaml exec passbolt /bin/bash -c \
+  'su -m -c "/var/www/passbolt/bin/cake passbolt register_user -u myuser@passbolt.local \
+   -f admin  -l admin  -r admin" -s /bin/sh www-data'
+
 ```
 
 > Plik `docker-compose.yaml` zawiera definicje wszystkich kontenerów.
@@ -117,6 +123,8 @@ Plik: `nginx/nginx.conf`
   - `grafana.local` → `grafana:3000`
   - `adminer.local` → `adminer:8080`
   - `prometheus.local` → `prometheus:9090`
+  - `mailhog.local` -> `mailhog:1025`
+  - `phpldapadmin.local` -> `phpldapadmin:`
 - Obsługa certyfikatów SSL:
   - `/etc/nginx/certs/local.crt`
   - `/etc/nginx/certs/local.key`
@@ -154,3 +162,4 @@ docker compose logs -f <service_name>
 ```bash
 docker compose ps -a
 ```
+
