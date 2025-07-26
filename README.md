@@ -58,7 +58,8 @@ Konteneryzowane środowisko testowo-developerskie zawierające Passbolt, LDAP, s
 
   ```bash
   git clone https://github.com/passbolt/passbolt_api.git
-  cp ./passbolt_api/config/app.default.php ./passbolt_api/config/app.php
+  cd passbolt_api
+  cp config/app.default.php config/app.php
   docker run --rm --interactive --tty --volume $PWD:/app composer install --ignore-platform-reqs
   ```
 
@@ -85,9 +86,9 @@ Konteneryzowane środowisko testowo-developerskie zawierające Passbolt, LDAP, s
 5. **Utwórz pierwszego użytkownika (administratora) do Passbolt**:
     
     ```bash
-    docker-compose exec passbolt /bin/bash -c \
-  'su -m -c "/var/www/passbolt/bin/cake passbolt register_user -u admin@passbolt.local \
-   -f admin  -l admin  -r admin" -s /bin/sh www-data'
+    docker compose exec passbolt /bin/bash -c \
+    'su -m -c "/var/www/passbolt/bin/cake passbolt register_user -u admin@passbolt.local \
+    -f admin  -l admin  -r admin" -s /bin/sh www-data'
     ```
 ---
 
