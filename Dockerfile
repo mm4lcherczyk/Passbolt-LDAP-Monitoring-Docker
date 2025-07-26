@@ -108,5 +108,3 @@ COPY bin/docker-entrypoint.sh /docker-entrypoint.sh
 COPY scripts/wait-for.sh /usr/bin/wait-for.sh
 
 EXPOSE 80 443
-
-CMD ["/docker-entrypoint.sh"]

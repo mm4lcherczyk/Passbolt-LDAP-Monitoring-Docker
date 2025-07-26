@@ -1,6 +1,6 @@
 # Passbolt + LDAP + Monitoring – Środowisko Docker
 
-Konteneryzowane środowisko testowo-developerskie zawierające Passbolt CE, LDAP, system monitorowania (Grafana, Prometheus, Loki), bazę danych MariaDB, reverse proxy i narzędzia developerskie.
+Konteneryzowane środowisko testowo-developerskie zawierające Passbolt, LDAP, system monitorowania (Grafana, Prometheus, Loki, Cadvisor, Promtail), bazę danych MariaDB, reverse proxy i narzędzia developerskie (MailHog, phpLDAPadmin, Adminer).
 
 ---
 
@@ -21,6 +21,7 @@ Konteneryzowane środowisko testowo-developerskie zawierające Passbolt CE, LDAP
 | **loki**       | Zbieranie logów                           |
 | **promtail**   | Forwardowanie logów do Loki               |
 
+
 ---
 
 ##  Wymagania
@@ -32,36 +33,62 @@ Konteneryzowane środowisko testowo-developerskie zawierające Passbolt CE, LDAP
 
 ---
 
-##  Uruchomienie środowiska
-
-```bash
-# Zbuduj obrazy
-docker compose -f build
-
-# Uruchom kontenery
-docker compose -f up -d
-```
-
-> Plik `docker-compose-dev.yaml` zawiera definicje wszystkich kontenerów.
-
----
 
 ## Dostęp do usług
 
-| Usługa         | URL                                     |
-|----------------|------------------------------------------|
-| Passbolt       | https://passbolt.local                  |
-| Adminer        | https://adminer.local                   |
-| Mailhog        | https://mailhog.local                 |
-| Grafana        | https://grafana.local                   |
-| Prometheus     | https://prometheus.local                |
-| PhpLDAPAdmin   | https://phpldapadmin.local                   |
+| Usługa           | URL                              |
+|------------------|-----------------------------------|
+| Passbolt         | https://passbolt.local           |
+| Adminer          | https://adminer.local             |
+| Mailhog (Web UI) | https://mailhog.local             |
+| Grafana          | https://grafana.local             |
+| Prometheus       | https://prometheus.local          |
+| phpLDAPadmin     | https://phpldapadmin.local        |
+| cAdvisor         | https://cadvisor.local            |
+| Loki API         | https://loki.local               |
 
-> **Uwaga:** aby domeny `*.local` działały, dodaj do pliku `/etc/hosts`:
-```
-127.0.0.1 passbolt.local grafana.local adminer.local prometheus.local mailhog.local phpldapadmin.local
-```
 
+> **Hasła domyślne:**  
+> – Grafana: `admin` / `admin`  
+> – MariaDB root: zdefiniowane w `env/mysql.env`  
+> – LDAP admin: `admin` (pod `cn=admin,dc=mailhog,dc=local`)
+
+### 🚀 Uruchomienie
+1. **Pobierz i przygotuj kod źródłowy Passbolt
+
+  ```bash
+  git clone https://github.com/passbolt/passbolt_api.git
+  cp ./passbolt_api/config/app.default.php ./passbolt_api/config/app.php
+  docker run --rm --interactive --tty --volume $PWD:/app composer install --ignore-platform-reqs
+  ```
+
+1. **Uzupełnij `/etc/hosts`** (Linux/macOS lub Windows):
+
+    ```text
+    127.0.0.1 passbolt.local grafana.local adminer.local prometheus.local \
+               mailhog.local phpldapadmin.local cadvisor.local loki.local
+    ```
+
+
+3. **Zbuduj oraz uruchom kontenery**:
+
+    ```bash
+    docker compose up -d
+    ```
+
+4. **Sprawdź status**:
+
+    ```bash
+    docker compose ps
+    ```
+
+5. **Utwórz pierwszego użytkownika (administratora) do Passbolt**:
+    
+    ```bash
+    docker-compose exec passbolt /bin/bash -c \
+  'su -m -c "/var/www/passbolt/bin/cake passbolt register_user -u admin@passbolt.local \
+   -f admin  -l admin  -r admin" -s /bin/sh www-data'
+    ```
 ---
 
 ## Struktura katalogów
@@ -70,16 +97,22 @@ docker compose -f up -d
 .
 ├── docker-compose-dev.yaml
 ├── Dockerfile
+├── passbolt_api/
+├── .env
 ├── env/
 │   ├── mysql.env
+│   ├── openldap.env
 │   └── passbolt.env
+├── README.md
+├── mysql/
+│   ├── init.sql
 ├── nginx/
 │   ├── nginx.conf
 │   └── certs/
 ├── monitoring/
 │   ├── prometheus/prometheus.yml
-│   ├── grafana/datasources/
-│   ├── grafana/dashboards/
+│   ├── grafana/provisioning/dashboards.yaml
+│   ├── grafana/dashboards/docker-dashboard.json
 │   ├── loki/loki-config.yml
 │   └── promtail/config.yml
 ├── conf/
@@ -109,14 +142,34 @@ Budowany lokalnie z:
 
 ---
 
+# LDAP – OpenLDAP
+Plik: `openldap/openldap.conf`
+- Serwer LDAP z TLS
+- Użytkownik admin: `cn=admin,dc=mailhog,dc=local
+- Hasło admin: `admin`
+- Port: `389` (TLS na `636`)
+- Baza danych: `dc=mailhog,dc=local`
+- Schematy: `core`, `cosine`, `nis`, `inetorgperson`
+- Wstępnie zdefiniowane grupy i użytkownicy:
+  - Grupa `admins` z użytkownikiem `admin`
+  - Grupa `users` z użytkownikami `user1`, `user2`, `user3`
+- Użytkownicy mają hasła: `user1`, `user2`, `user3` (wygenerowane losowo)
+- Użytkownicy mogą się logować do Passbolt i phpLDAPadmin
+
+
 ## Nginx – reverse proxy
 
 Plik: `nginx/nginx.conf`
 
 - Reverse proxy dla:
   - `grafana.local` → `grafana:3000`
-  - `adminer.local` → `adminer:8080`
+  - `adminer.local` → `adminer:9501`
   - `prometheus.local` → `prometheus:9090`
+  - `mailhog.local` → `mailhog:8025`
+  - `phpldapadmin.local` → `phpldapadmin:8080`
+  - `cadvisor.local` → `cadvisor:8081`
+  - `loki.local` → `loki:3100`
+
 - Obsługa certyfikatów SSL:
   - `/etc/nginx/certs/local.crt`
   - `/etc/nginx/certs/local.key`
@@ -136,21 +189,14 @@ Plik: `nginx/nginx.conf`
 ### Grafana
 - Domyślne hasło: `admin / admin`
 - Źródła danych: Prometheus, Loki
+- Dashboardy:
+  - `container-monitoring.json` – monitorowanie kontenerów Docker
 
 ### Loki + Promtail
 - Zbieranie logów z kontenerów Docker
 - Konfiguracje w `monitoring/loki` i `promtail/`
 
+### cAdvisor
+- Monitorowanie kontenerów Docker
+- Dostępne metryki: CPU, pamięć, sieć, dysk
 ---
-
-## Debugowanie
-
-- Logi:
-```bash
-docker compose logs -f <service_name>
-```
-
-- Status kontenerów:
-```bash
-docker compose ps -a
-```
