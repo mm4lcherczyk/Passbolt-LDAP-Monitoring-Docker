@@ -42,8 +42,8 @@ docker compose build
 docker compose up -d
 
 # Stwórz pierwszego użytkownika (administratora) 
-docker-compose -f dev/docker-compose-dev.yaml exec passbolt /bin/bash -c \
-  'su -m -c "/var/www/passbolt/bin/cake passbolt register_user -u myuser@passbolt.local \
+docker-compose exec passbolt /bin/bash -c \
+  'su -m -c "/var/www/passbolt/bin/cake passbolt register_user -u admin@passbolt.local \
    -f admin  -l admin  -r admin" -s /bin/sh www-data'
 
 ```
