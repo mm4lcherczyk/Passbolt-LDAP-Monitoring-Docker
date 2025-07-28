@@ -63,7 +63,7 @@ Konteneryzowane środowisko testowo-developerskie zawierające Passbolt, LDAP, s
   docker run --rm --interactive --tty --volume $PWD:/app composer install --ignore-platform-reqs
   ```
 
-1. **Uzupełnij `/etc/hosts`** (Linux/macOS lub Windows):
+2. **Uzupełnij `/etc/hosts`** (Linux/macOS lub Windows):
 
     ```text
     127.0.0.1 passbolt.local grafana.local adminer.local prometheus.local \
